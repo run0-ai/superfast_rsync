@@ -24,24 +24,45 @@ A high-performance implementation of the rsync algorithm in pure Rust, featuring
 
 ## 📊 Performance Results
 
-Our comprehensive benchmarking shows dramatic performance improvements:
+Our comprehensive benchmarking shows dramatic performance improvements. **Note: These results are specific to our test cases with synthetic data. Real-world performance will vary based on data characteristics.**
 
-### Delta Generation Speedup
-| File Size | Sequential BLAKE3 | Parallel BLAKE3 | Speedup |
-|-----------|-------------------|-----------------|---------|
-| 5MB       | ~3 MB/s          | ~240 MB/s       | **80×** |
-| 25MB      | ~3 MB/s          | ~226 MB/s       | **75×** |
-| 100MB     | ~3 MB/s          | ~236 MB/s       | **79×** |
+### Delta Generation Speedup (Test Data)
+| File Size | Dropbox Rsync | Sequential BLAKE3 | Parallel BLAKE3 | Speedup vs Dropbox |
+|-----------|---------------|-------------------|-----------------|-------------------|
+| 5MB       | ~15 MB/s      | ~55 MB/s         | ~303 MB/s       | **20×** |
+| 25MB      | ~18 MB/s      | ~60 MB/s         | ~271 MB/s       | **15×** |
+| 100MB     | ~20 MB/s      | ~55 MB/s         | ~262 MB/s       | **13×** |
 
-### Compression Ratios
+### Compression Ratios (Test Data)
 - **Small files (5MB, 10% delta)**: 90% compression
 - **Medium files (25MB, 50% delta)**: 50% compression  
 - **Large files (100MB, 80% delta)**: 20% compression
 
-### CPU Efficiency
+### CPU Efficiency (Test Data)
 - **Parallel BLAKE3** reduces CPU cycles for delta generation by **50-100×**
+- **Sequential BLAKE3** is **2-3× faster** than MD4 due to optimized implementation
+- **MD4** is slower than BLAKE3 despite being "simpler" due to complex SIMD optimizations
 - **Memory usage** scales linearly with file size
 - **Block size optimization** provides additional performance tuning
+
+### Data Type Considerations
+Performance varies significantly based on data characteristics:
+
+**High Compression Scenarios:**
+- **Text files**: Excellent compression, 80-95% typical
+- **Source code**: Very good compression, 70-90% typical
+- **Log files**: Good compression, 60-85% typical
+
+**Low Compression Scenarios:**
+- **Encrypted data**: Poor compression, 0-10% typical
+- **Compressed files**: Very poor compression, 0-5% typical
+- **Random data**: No compression, 0% typical
+- **High-entropy binary**: Poor compression, 5-20% typical
+
+**Performance Impact:**
+- **High compression data**: Parallel processing shows maximum benefit
+- **Low compression data**: Sequential algorithms may be faster due to less work
+- **Mixed data**: Block size becomes critical for optimal performance
 
 ## 🛠️ Installation
 
@@ -265,4 +286,4 @@ This project is licensed under the Apache-2.0 License.
 
 ---
 
-**Performance results from comprehensive testing on modern multi-core systems. Your mileage may vary based on hardware and workload characteristics.**
+**Performance results from comprehensive testing on modern multi-core systems with synthetic test data. Real-world performance will vary significantly based on data characteristics, hardware, and workload patterns.**
