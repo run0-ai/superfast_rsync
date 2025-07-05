@@ -45,6 +45,10 @@ exclude = [
 [dependencies]
 arrayref.workspace = true
 blake3.workspace = true
+rayon = { version = "1.8", optional = true }
+
+[features]
+parallel = ["rayon"]
 
 [dev-dependencies]
 librsync.workspace = true

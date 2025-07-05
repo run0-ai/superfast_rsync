@@ -1,4 +1,6 @@
 use superfast_rsync::{Signature, SignatureOptions, diff, apply, HashAlgorithm};
+#[cfg(feature = "parallel")]
+use superfast_rsync::diff_parallel;
 use std::fs;
 use std::time::Instant;
 use std::io;
@@ -117,7 +119,18 @@ pub fn main() -> io::Result<()> {
     // Step 4: Generate delta between original and modified
     let mut delta = Vec::new();
     let t1 = Instant::now();
-    diff(&indexed, &modified, &mut delta).expect("diff failed");
+    
+    #[cfg(feature = "parallel")]
+    {
+        // Use parallel diff if feature is enabled
+        diff_parallel(&indexed, &modified, &mut delta).expect("parallel diff failed");
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        // Use sequential diff
+        diff(&indexed, &modified, &mut delta).expect("diff failed");
+    }
+    
     let t_diff = t1.elapsed();
 
     // Step 5: Apply delta to reconstruct modified

@@ -2,6 +2,10 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
+use std::sync::Arc;
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 use crate::consts::{
     DELTA_MAGIC, RS_OP_COPY_N1_N1, RS_OP_END, RS_OP_LITERAL_1, RS_OP_LITERAL_N1, RS_OP_LITERAL_N2,
@@ -227,6 +231,77 @@ pub fn diff(
                 data[here - 1],
                 data[here + block_size as usize - 1],
             );
+        }
+    }
+    state.emit(data.len(), data, &mut out)?;
+    out.write_all(&[RS_OP_END])?;
+    Ok(())
+}
+
+/// Calculate a delta using parallel processing and write it to `out`.
+/// This is a parallel version of the `diff` function that uses Rayon for
+/// multi-threaded block comparison.
+///
+/// # Security
+/// Since `fast_rsync` uses the insecure MD4 hash algorithm, the resulting delta must not be
+/// trusted to correctly reconstruct `data`. The delta might fail to apply or produce the wrong
+/// data entirely. Always use another mechanism, like a cryptographic hash function, to validate
+/// the final reconstructed data.
+///
+/// # Features
+/// This function requires the `parallel` feature to be enabled.
+#[cfg(feature = "parallel")]
+pub fn diff_parallel(
+    signature: &IndexedSignature<'_>,
+    data: &[u8],
+    mut out: impl Write,
+) -> Result<(), DiffError> {
+    // MD4 is always sequential
+    if let SignatureType::Md4 = signature.signature_type {
+        return diff(signature, data, out);
+    }
+    // Only parallelize for Blake3
+    let block_size = signature.block_size;
+    let crypto_hash_size = signature.crypto_hash_size as usize;
+    if let SignatureType::Blake3 = signature.signature_type {
+        if crypto_hash_size > BLAKE3_SIZE {
+            return Err(DiffError::InvalidSignature);
+        }
+    } else {
+        return Err(DiffError::InvalidSignature);
+    }
+    out.write_all(&DELTA_MAGIC.to_be_bytes())?;
+    let signature_arc = Arc::new(signature);
+    let block_size_usize = block_size as usize;
+    let blocks: Vec<_> = (0..data.len().saturating_sub(block_size_usize - 1))
+        .step_by(block_size_usize)
+        .collect();
+    let results: Vec<_> = blocks
+        .par_iter()
+        .map(|&start| {
+            let end = (start + block_size_usize).min(data.len());
+            let block_data = &data[start..end];
+            let crc = Crc::new().update(block_data);
+            if let Some(blocks) = signature_arc.blocks.get(&crc) {
+                let digest = blake3(block_data).to_vec();
+                if let Some(&idx) = blocks.get(&&digest[..crypto_hash_size]) {
+                    return Ok::<Option<(usize, u64, usize)>, DiffError>(Some((start, idx as u64 * block_size as u64, block_size_usize)));
+                }
+            }
+            Ok::<Option<(usize, u64, usize)>, DiffError>(None)
+        })
+        .collect();
+    let mut state = OutputState {
+        emitted: 0,
+        queued_copy: None,
+    };
+    for result in results {
+        match result? {
+            Some((start, offset, len)) => {
+                state.emit(start, data, &mut out)?;
+                state.copy(offset, len, start, data, &mut out)?;
+            }
+            None => {}
         }
     }
     state.emit(data.len(), data, &mut out)?;

@@ -57,16 +57,22 @@ def generate_file_pair(base_name, size_mb, delta_percent, output_dir="/tmp"):
     
     return original_path, modified_path
 
-def run_performance_test(original_file, modified_file, hash_algo, block_size, hash_size):
+def run_performance_test(original_file, modified_file, hash_algo, block_size, hash_size, use_parallel=False):
     """Run a single performance test and return the results."""
     cmd = [
         "cargo", "run", "--example", "performance_test",
+    ]
+    
+    if use_parallel:
+        cmd.extend(["--features", "parallel"])
+    
+    cmd.extend([
         "--", "--original", original_file,
         "--modified", modified_file,
         "--hash", hash_algo,
         "--block-size", str(block_size),
         "--hash-size", str(hash_size)
-    ]
+    ])
     
     print(f"  Running: {' '.join(cmd)}")
     
@@ -123,32 +129,25 @@ def parse_performance_output(output):
 
 def run_comprehensive_performance_tests(test_files, output_dir):
     """Run comprehensive performance tests on all test files."""
-    # Optimized test configurations - reduced from 36 to 7 tests for efficiency
-    # 3 file sizes × 2 blake3 block sizes + 1 md4 = 7 tests
+    # 3 file sizes × 2 blake3 block sizes × 2 (seq+par) + 1 md4 = 13 tests
     hash_algorithms = ["blake3"]
     block_sizes = [4096, 16384]
     hash_sizes = [16]
-    
-    # Prepare results storage
+    total_tests = len(test_files) * len(hash_algorithms) * len(block_sizes) * len(hash_sizes) * 2 + len(test_files)  # ×2 for blake3 seq+par, +1 for md4_seq
+    current_test = 0
+    print(f"\n🚀 Starting comprehensive performance tests ({total_tests} total configurations)...")
     results = []
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_file = os.path.join(output_dir, f"performance_results_{timestamp}.csv")
-    
-    # Run tests
-    total_tests = len(test_files) * len(hash_algorithms) * len(block_sizes) * len(hash_sizes) + len(test_files)  # +1 for each md4
-    current_test = 0
-    
-    print(f"\n🚀 Starting comprehensive performance tests ({total_tests} total configurations)...")
-    
     for test_file in test_files:
         print(f"\n📁 Testing {test_file['name']} files ({test_file['size_mb']}MB, {test_file['delta_percent']}% delta)")
-        # BLAKE3 runs
+        # Sequential BLAKE3 runs
         for hash_algo in hash_algorithms:
             algo_hash_sizes = hash_sizes
             for hash_size in algo_hash_sizes:
                 for block_size in block_sizes:
                     current_test += 1
-                    print(f"\n  Test {current_test}/{total_tests}: {hash_algo} (hash={hash_size}, block={block_size})")
+                    print(f"\n  Test {current_test}/{total_tests}: {hash_algo} sequential (hash={hash_size}, block={block_size})")
                     if not os.path.exists(test_file['original_path']) or not os.path.exists(test_file['modified_path']):
                         print(f"    ❌ File not found.")
                         continue
@@ -157,7 +156,8 @@ def run_comprehensive_performance_tests(test_files, output_dir):
                         test_file['modified_path'],
                         hash_algo,
                         block_size,
-                        hash_size
+                        hash_size,
+                        use_parallel=False
                     )
                     if error_code is not None:
                         print(f"    ❌ Test failed with error code {error_code}")
@@ -173,22 +173,62 @@ def run_comprehensive_performance_tests(test_files, output_dir):
                         'test_name': test_file['name'],
                         'file_size_mb': test_file['size_mb'],
                         'delta_percent': test_file['delta_percent'],
-                        'hash_algorithm': hash_algo,
+                        'hash_algorithm': f"{hash_algo}_seq",
                         'block_size': block_size,
                         'hash_size': hash_size,
                         **metrics
                     }
                     results.append(result)
                     print(f"    ✅ Success: {metrics.get('compression_ratio_percent', 0):.1f}% compression")
-        # MD4 single run for comparison
+        # Parallel BLAKE3 runs
+        for hash_algo in hash_algorithms:
+            algo_hash_sizes = hash_sizes
+            for hash_size in algo_hash_sizes:
+                for block_size in block_sizes:
+                    current_test += 1
+                    print(f"\n  Test {current_test}/{total_tests}: {hash_algo} parallel (hash={hash_size}, block={block_size})")
+                    if not os.path.exists(test_file['original_path']) or not os.path.exists(test_file['modified_path']):
+                        print(f"    ❌ File not found.")
+                        continue
+                    stdout, stderr, error_code = run_performance_test(
+                        test_file['original_path'],
+                        test_file['modified_path'],
+                        hash_algo,
+                        block_size,
+                        hash_size,
+                        use_parallel=True
+                    )
+                    if error_code is not None:
+                        print(f"    ❌ Test failed with error code {error_code}")
+                        if stderr:
+                            print(f"    Error: {stderr}")
+                        continue
+                    metrics = parse_performance_output(stdout)
+                    if not metrics:
+                        print(f"    ⚠️  Could not parse results")
+                        continue
+                    result = {
+                        'timestamp': datetime.now().isoformat(),
+                        'test_name': test_file['name'],
+                        'file_size_mb': test_file['size_mb'],
+                        'delta_percent': test_file['delta_percent'],
+                        'hash_algorithm': f"{hash_algo}_par",
+                        'block_size': block_size,
+                        'hash_size': hash_size,
+                        **metrics
+                    }
+                    results.append(result)
+                    print(f"    ✅ Success: {metrics.get('compression_ratio_percent', 0):.1f}% compression")
+        # Sequential MD4 run for comparison
         current_test += 1
-        print(f"\n  Test {current_test}/{total_tests}: md4 (hash=16, block=4096)")
+        print(f"\n  Test {current_test}/{total_tests}: md4 sequential (hash=16, block=4096)")
         stdout, stderr, error_code = run_performance_test(
             test_file['original_path'],
             test_file['modified_path'],
             "md4",
             4096,
-            16
+            16,
+            use_parallel=False
         )
         if error_code is not None:
             print(f"    ❌ Test failed with error code {error_code}")
@@ -204,14 +244,13 @@ def run_comprehensive_performance_tests(test_files, output_dir):
             'test_name': test_file['name'],
             'file_size_mb': test_file['size_mb'],
             'delta_percent': test_file['delta_percent'],
-            'hash_algorithm': "md4",
+            'hash_algorithm': "md4_seq",
             'block_size': 4096,
             'hash_size': 16,
             **metrics
         }
         results.append(result)
         print(f"    ✅ Success: {metrics.get('compression_ratio_percent', 0):.1f}% compression")
-    # Save results
     if results:
         fieldnames = [
             'timestamp', 'test_name', 'file_size_mb', 'delta_percent',

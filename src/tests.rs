@@ -2,6 +2,8 @@ use quickcheck_macros::quickcheck;
 use std::io::Cursor;
 
 use crate::{apply, diff, Signature, SignatureOptions};
+#[cfg(feature = "parallel")]
+use crate::diff_parallel;
 
 #[quickcheck]
 fn test_signature_creation(data: Vec<u8>, block_size: u32, crypto_hash_size: u32) {
@@ -216,4 +218,61 @@ fn test_apply_errors() {
             .to_string(),
         "unexpected data after end command (len=1)",
     );
+}
+
+#[cfg(feature = "parallel")]
+#[test]
+fn test_parallel_trivial() {
+    let data = vec![0; 100000];
+    let signature = Signature::calculate(
+        &data,
+        SignatureOptions {
+            block_size: 64,
+            crypto_hash_size: 5,
+            hash_algorithm: crate::HashAlgorithm::Blake3,
+        },
+    );
+    let indexed = signature.index();
+    let mut patch = vec![];
+    diff_parallel(&indexed, &data, &mut patch).expect("parallel diff error");
+    let mut out = vec![];
+    assert!(patch.len() < 10000);
+    apply(&data, &patch, &mut out).expect("apply error");
+    assert_eq!(data, out);
+}
+
+#[cfg(feature = "parallel")]
+#[test]
+fn test_parallel_vs_sequential() {
+    let data = vec![0; 100000];
+    let signature = Signature::calculate(
+        &data,
+        SignatureOptions {
+            block_size: 4096,
+            crypto_hash_size: 8,
+            hash_algorithm: crate::HashAlgorithm::Blake3,
+        },
+    );
+    let indexed = signature.index();
+    
+    // Generate sequential delta
+    let mut sequential_patch = vec![];
+    diff(&indexed, &data, &mut sequential_patch).expect("sequential diff error");
+    
+    // Generate parallel delta
+    let mut parallel_patch = vec![];
+    diff_parallel(&indexed, &data, &mut parallel_patch).expect("parallel diff error");
+    
+    // Both should produce identical results
+    assert_eq!(sequential_patch, parallel_patch);
+    
+    // Both should apply correctly
+    let mut sequential_out = vec![];
+    let mut parallel_out = vec![];
+    apply(&data, &sequential_patch, &mut sequential_out).expect("sequential apply error");
+    apply(&data, &parallel_patch, &mut parallel_out).expect("parallel apply error");
+    
+    assert_eq!(sequential_out, parallel_out);
+    assert_eq!(data, sequential_out);
+    assert_eq!(data, parallel_out);
 }

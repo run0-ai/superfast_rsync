@@ -27,5 +27,7 @@ mod signature;
 mod tests;
 
 pub use diff::{diff, DiffError};
+#[cfg(feature = "parallel")]
+pub use diff::diff_parallel;
 pub use patch::{apply, apply_limited, ApplyError};
 pub use signature::{IndexedSignature, Signature, SignatureOptions, SignatureParseError, HashAlgorithm};
