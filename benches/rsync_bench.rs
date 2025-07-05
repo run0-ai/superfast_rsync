@@ -8,7 +8,7 @@ mod crc;
 
 use crate::crc::Crc;
 use criterion::{black_box, BenchmarkId, Criterion, Throughput};
-use fast_rsync::{apply_limited, diff, Signature, SignatureOptions};
+use superfast_rsync::{apply_limited, diff, Signature, SignatureOptions};
 use std::io;
 
 fn random_block(len: usize) -> Vec<u8> {
@@ -52,6 +52,7 @@ fn calculate_signature(c: &mut Criterion) {
                     SignatureOptions {
                         block_size: 4096,
                         crypto_hash_size: 8,
+                        hash_algorithm: superfast_rsync::HashAlgorithm::Blake3,
                     },
                 )
                 .into_serialized();
@@ -91,6 +92,7 @@ fn bench_diff(
         SignatureOptions {
             block_size: 4096,
             crypto_hash_size: 8,
+            hash_algorithm: superfast_rsync::HashAlgorithm::Blake3,
         },
     )
     .into_serialized();
@@ -163,6 +165,7 @@ fn apply_delta(c: &mut Criterion) {
             SignatureOptions {
                 block_size: 4096,
                 crypto_hash_size: 8,
+                hash_algorithm: superfast_rsync::HashAlgorithm::Blake3,
             },
         )
         .index(),

@@ -57,7 +57,7 @@ mod tests {
         let data3 = b"block3";
         
         let datas = vec![data1, data2, data3];
-        let results: Vec<_> = blake3_many(datas.into_iter()).collect();
+        let results: Vec<_> = blake3_many(datas.iter().map(|x| &x[..])).collect();
         
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].0, b"block1");

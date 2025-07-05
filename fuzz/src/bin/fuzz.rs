@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate honggfuzz;
 
-use fast_rsync::{apply_limited, ApplyError};
+use superfast_rsync::{apply_limited, ApplyError};
 use rand::rngs::SmallRng;
 use rand::{RngCore, SeedableRng};
 use std::io::Cursor;

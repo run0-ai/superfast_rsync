@@ -38,7 +38,7 @@ pub struct IndexedSignature<'a> {
 /// The hash type used with within the signature.
 /// Note that this library generally only supports MD4 signatures.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum SignatureType {
+pub enum SignatureType {
     Md4,
     Blake2,
     Blake3,

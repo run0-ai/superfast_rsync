@@ -24,7 +24,7 @@ where
 {
     Empty,
     Single(K, V),
-    TwoOrMore(Box<HashMap<K, V>>),
+    TwoOrMore(HashMap<K, V>),
 }
 
 impl<K, V> Default for SecondLayerMap<K, V>
@@ -47,7 +47,7 @@ where
         let (new_state, ret) = match old_state {
             Self::Empty => (Self::Single(key, val), None),
             Self::Single(old_key, old_val) => {
-                let mut map = Box::new(HashMap::with_capacity(2));
+                let mut map = HashMap::with_capacity(2);
                 map.insert(key, val);
                 let ret = map.insert(old_key, old_val);
                 (Self::TwoOrMore(map), ret)

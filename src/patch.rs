@@ -61,42 +61,39 @@ pub enum ApplyError {
 impl fmt::Display for ApplyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApplyError::WrongMagic { magic } => write!(f, "incorrect magic: 0x{:08x}", magic),
+            ApplyError::WrongMagic { magic } => write!(f, "incorrect magic: 0x{magic:08x}"),
             ApplyError::UnexpectedEof {
                 reading,
                 expected,
                 available,
-            } => write!(
+                          } => write!(
                 f,
-                "unexpected end of input when reading {} (expected={}, available={})",
-                reading, expected, available
+                "unexpected end of input when reading {reading} (expected={expected}, available={available})",
             ),
             ApplyError::OutputLimit {
                 what,
                 wanted,
                 available,
-            } => write!(
+                          } => write!(
                 f,
-                "exceeded output size limit when writing {} (wanted={}, available={})",
-                what, wanted, available
+                "exceeded output size limit when writing {what} (wanted={wanted}, available={available})",
             ),
             ApplyError::CopyOutOfBounds {
                 offset,
                 len,
                 data_len,
-            } => write!(
+                          } => write!(
                 f,
-                "requested copy is out of bounds (offset={}, len={}, data_len={})",
-                offset, len, data_len
+                "requested copy is out of bounds (offset={offset}, len={len}, data_len={data_len})",
             ),
             ApplyError::CopyZero => f.write_str("copy length is empty"),
             ApplyError::UnknownCommand { command } => {
-                write!(f, "unexpected command byte: 0x{:02x}", command)
+                write!(f, "unexpected command byte: 0x{command:02x}")
             }
             ApplyError::TrailingData { length } => {
-                write!(f, "unexpected data after end command (len={})", length)
+                write!(f, "unexpected data after end command (len={length})")
             }
-            Self::Io(source) => write!(f, "io error while writing the output (source={})", source),
+            Self::Io(source) => write!(f, "io error while writing the output (source={source})"),
         }
     }
 }
@@ -150,7 +147,7 @@ pub fn apply_limited(
     macro_rules! safe_cast {
         ($val:expr, $ty:ty, $err:expr) => {{
             let val = $val;
-            if val as u64 > <$ty>::max_value() as u64 {
+                          if val as u64 > <$ty>::MAX as u64 {
                 return Err($err);
             }
             val as $ty
@@ -190,7 +187,7 @@ pub fn apply_limited(
                         usize,
                         ApplyError::OutputLimit {
                             what: "literal",
-                            wanted: usize::max_value(),
+                            wanted: usize::MAX,
                             available: limit,
                         }
                     )
@@ -237,5 +234,5 @@ pub fn apply_limited(
 /// large output which can exhaust available memory. Use [apply_limited()] instead to set an upper
 /// bound on the size of `out`.
 pub fn apply(base: &[u8], delta: &[u8], out: &mut impl Write) -> Result<(), ApplyError> {
-    apply_limited(base, delta, out, usize::max_value())
+    apply_limited(base, delta, out, usize::MAX)
 }

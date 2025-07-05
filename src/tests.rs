@@ -10,6 +10,7 @@ fn test_signature_creation(data: Vec<u8>, block_size: u32, crypto_hash_size: u32
         SignatureOptions {
             block_size: block_size.saturating_add(1),
             crypto_hash_size: crypto_hash_size % 16,
+            hash_algorithm: crate::HashAlgorithm::Blake3,
         },
     );
     let serialized = signature.serialized().to_vec();
@@ -25,6 +26,7 @@ fn test_trivial() {
         SignatureOptions {
             block_size: 64,
             crypto_hash_size: 5,
+            hash_algorithm: crate::HashAlgorithm::Blake3,
         },
     );
     let indexed = signature.index();
@@ -48,6 +50,7 @@ fn test_delta_size() {
         SignatureOptions {
             block_size: 4096,
             crypto_hash_size: 8,
+            hash_algorithm: crate::HashAlgorithm::Blake3,
         },
     );
     let mut patch = vec![];
@@ -70,6 +73,7 @@ fn test_random() {
         SignatureOptions {
             block_size: 4,
             crypto_hash_size: 8,
+            hash_algorithm: crate::HashAlgorithm::Md4,
         },
     );
     let indexed = signature.index();
@@ -121,6 +125,7 @@ fn test_signature_interoperability() {
                     SignatureOptions {
                         block_size: block_len as u32,
                         crypto_hash_size: strong_len as u32,
+                        hash_algorithm: crate::HashAlgorithm::Md4,
                     },
                 );
                 let serialized = signature.into_serialized();

@@ -1,31 +1,59 @@
-[package]
-name = "fast_rsync"
-version = "0.2.0"
-authors = ["Dropbox Engineering", "bacher09, Artyom Pavlov (RustCrypto/hashes/MD4)"]
+[workspace]
+members = [
+    ".",
+    "fuzz",
+]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
 license = "Apache-2.0"
+authors = ["Dropbox Engineering"]
 description = "An optimized implementation of librsync in pure Rust."
-readme = "README.md"
-repository = "https://github.com/dropbox/fast_rsync"
-keywords = ["rsync"]
-edition = "2018"
+
+[workspace.dependencies]
+arrayref = "0.3.6"
+blake3 = "1.5"
+librsync = { git = "https://github.com/goffrie/librsync-rs", rev = "e2e4b06022d889e020c439f2dc92ea2fec0e483e", default-features = false }
+quickcheck = { version = "1.0", default-features = false }
+quickcheck_macros = "1.0"
+rand = { version = "0.8" }
+criterion = { version = "0.5", default-features = false }
+clap = { version = "4.0", features = ["derive"] }
+honggfuzz = "0.5.54"
+
+[package]
+name = "superfast_rsync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description.workspace = true
 
 exclude = [
     ".github",
     ".gitignore",
     "rust-toolchain",
+    "tools",
+    "examples",
+    "tests",
+    "docs",
 ]
 
 [dependencies]
-arrayref = "0.3.6"
-blake3 = "1.5"
+arrayref.workspace = true
+blake3.workspace = true
 
 [dev-dependencies]
-librsync = { git = "https://github.com/goffrie/librsync-rs", rev = "e2e4b06022d889e020c439f2dc92ea2fec0e483e", default-features = false }
-quickcheck = { version = "1.0", default-features = false }
-quickcheck_macros = "1.0"
-rand = "0.8"
-criterion = { version = "0.5", default-features = false }
+librsync.workspace = true
+quickcheck.workspace = true
+quickcheck_macros.workspace = true
+rand.workspace = true
+criterion.workspace = true
+clap = { workspace = true, features = ["derive"] }
 
 [[bench]]
 name = "rsync_bench"
-harness = false
+harness = false 
